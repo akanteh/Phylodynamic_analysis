@@ -1,0 +1,63 @@
+---
+title: "Annotating Phylogenetic Tree"
+author: "Abdoulie Kanteh"
+date: "2025-01-16"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+
+```{r setup, include=FALSE}
+# Load required libraries
+library(ape)
+library(ggtreeExtra)
+library(ggnewscale)
+library(tidytree)
+library(ggstar)
+library(gtable)
+library(tidyr)
+library(phytools)
+library(beastio)
+library(ggtree)
+```
+
+## Load and Visualize Gambia Global ML Tree
+
+```{r load-tree}
+# Define file paths 
+tree_file <- "/Users/akanteh/Documents/backup11:08:2022/phylodynamic_newAnalysis/cluster/gambianSamples/DatasetB/NewDataAnalysis/removingDuplicates/treetime/gambiaGlobalaligned.alnIQTREE.tree"
+metadata_file <- "/Users/akanteh/Documents/backup11:08:2022/phylodynamic_newAnalysis/cluster/gambianSamples/DatasetB/NewDataAnalysis/removingDuplicates/treetime/trait.txt"
+output_file <- "/Users/akanteh/Documents/backup11:08:2022/phylodynamic_newAnalysis/cluster/gambianSamples/DatasetB/NewDataAnalysis/removingDuplicates/treetime/gambiaGlobalaligned.alnIQTREE.pdf"
+
+# Read tree file
+GambiaGlobalMLTree <- read.tree(tree_file)
+
+# Load metadata and remove missing values
+lineage_dat <- read.delim(metadata_file, sep = "\t", header = TRUE) %>% drop_na()
+
+# Basic tree plot
+p <- ggtree(GambiaGlobalMLTree) +
+  theme_tree2()
+
+# Add metadata visualization
+p1 <- p %<+% lineage_dat +
+  geom_tippoint(aes(colour = location), alpha = 0.5, size = 2.0) +
+  scale_color_manual("Legend", values = c("#b300b3", "grey30"), na.value = "grey30") +
+  theme(legend.position = 'right', legend.key.size = unit(0.5, 'cm'))
+
+# Save the plot
+if (dir.exists(dirname(output_file))) {
+  ggsave(output_file, p1, width = 15, height = 15)
+} else {
+  message("Output directory does not exist. Please create it or check the file path.")
+}
+```
+
+```{r session-info}
+# Check session info for debugging
+sessionInfo()
+
+

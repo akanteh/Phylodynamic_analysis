@@ -1,0 +1,98 @@
+---
+title: "Phylodynamic Analysis of SARS-CoV-2 in Gambia"
+author: "Abdoulie Kanteh"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Libraries
+```{r libraries}
+library(ape)
+library(ggtree)
+library(ggtreeExtra)
+library(ggplot2)
+library(ggnewscale)
+library(dplyr)
+library(tidytree)
+library(ggstar)
+library(lubridate)
+library(tidyr)
+library(tidyverse)
+library(beastio)
+library(treeio)
+library(rBt)
+```
+
+## Import Tree Data
+```{r import-tree}
+thorneyBeastTree <- read.annot.beast("/Users/akanteh/Documents/backup11:08:2022/phylodynamic_newAnalysis/cluster/gambianSamples/DatasetB/NewDataAnalysis/removingDuplicates/median_treeDTA_output/GambaGlobalCombinedsubsamplesMCC_median.tree")
+```
+
+## Import Metadata
+```{r import-metadata}
+nexcladeDatasetA <- read.csv("~/Documents/backup11:08:2022/phylodynamic_newAnalysis/cluster/gambianSamples/DatasetA/nextcladeDatasetA.csv")
+nexcladeDatasetA <- nexcladeDatasetA %>% 
+  dplyr::select(seqName, Nextclade_pango) %>% 
+  mutate(variant = Nextclade_pango)
+```
+
+## Define Variant Categories
+```{r categorize-variants}
+delta_variants <- c("AY.34.1", "B.1.617.2", "AY.34", "AY.46", "AY.34.1.1", "AY.42", "AY.22", "AY.75", "AY.5", "AY.4", "AY.43", "AY.36", "AY.133", "AY.122")
+omicron_variants <- c("BA.1.1", "BA.1", "BA.1.17.2", "BA.1.17", "BA.1.1.14", "BA.1.15", "BA.1.18")
+others <- c("B.1.1.359", "B", "B.1.36.1", "B.1.609", "B.1.1.368", "A", "B.1.177", "B.1.1.294", "R.1", "B.1.214.2", "B.1.1.10", "B.1.619", "B.1.1.487", "B.6", "B.1.1.101")
+
+nexcladeDatasetA <- nexcladeDatasetA %>%
+  mutate(variant = case_when(
+    variant %in% delta_variants ~ "Delta Variant",
+    variant %in% omicron_variants ~ "Omicron Variant",
+    variant == "B.1.1.7" ~ "Alpha Variant",
+    variant == "B.1.525" ~ "Eta Variant",
+    variant %in% others ~ "Others",
+    TRUE ~ variant
+  ))
+```
+
+## Visualizing the Phylogenetic Tree
+```{r plot-tree}
+p <- ggtree(thorneyBeastTree, 
+            mrsd = "2022-03-31",
+            as.Date = TRUE,
+            color = "gray50",
+            size = 0.5,
+            ladderize = TRUE) +
+  theme_tree2()
+
+p1 <- p %<+% nexcladeDatasetA +
+  geom_tree(aes(color = variant), size = 1.0, alpha = 0.8) +  
+  scale_color_manual(
+    values = c("#51a0e9", "#DF11BD", "#0A098F", "#FFC000", "#75FF33", "#b151e9", "#8F098B", "#29dde0", "#E97451", "#CA11DF", "#964B00", "red", "#FF0000"), 
+    na.value = "NA") +
+  theme(
+    plot.margin = unit(c(0, 2, 0.5, 0), "cm"),
+    axis.text.x = element_text(angle = 90, color = "black", vjust = 0.5, hjust = 1, size = 12, face = "bold"),
+    axis.title.x = element_text(size = 12, face = "bold", color = "black", hjust = 0.5),
+    panel.background = element_rect(color = "transparent"),
+    plot.background = element_rect(color = "transparent"),
+    legend.position = "top",
+    legend.text = element_text(size = 12, face = "bold"),
+    legend.title = element_text(size = 12, face = "bold")
+  ) +
+  scale_x_date(
+    name = "Date",
+    date_labels = "%b %Y",
+    breaks = seq.Date(ymd("2019-12-01"), ymd("2022-03-31"), by = "3 months"),
+    limits = c(as.Date("2019-12-01"), as.Date("2022-03-31")),
+    minor_breaks = seq.Date(ymd("2019-12-01"), ymd("2022-03-31"), by = "1 month"),
+    expand = c(0.025, 0.025)
+  )
+```
+
+## Save Plot
+```{r save-plot, eval=FALSE}
+ggsave("~/Documents/backup11:08:2022/phylodynamic_newAnalysis/cluster/gambianSamples/DatasetB/NewDataAnalysis/phylogeography/timetree/discretContinentPhylo/rerun/GambaGlobalDatasetB.mcc.pdf", p1, width=15, height=15)
+

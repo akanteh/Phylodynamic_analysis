@@ -1,0 +1,50 @@
+---
+title: "Count by Size Category"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Preparation
+
+```{r}
+# Corrected Data
+data <- data.frame(
+  count = c(87, 30, 12, 3, 4), # numeric counts
+  category = c("singleton", "(2-10 genomes) small", "(11 -50 genomes) medium",
+               "(51 -100 genomes) big", "(100+ ) huge")
+)
+
+# Convert category to ordered factor
+data$category <- factor(data$category, 
+                        levels = c("singleton", "(2-10 genomes) small", 
+                                   "(11 -50 genomes) medium", 
+                                   "(51 -100 genomes) big", "(100+ ) huge"), 
+                        ordered = TRUE)
+```
+
+## Correlation Calculation
+
+```{r}
+# Calculate correlation
+cor_value <- cor(data$count, as.numeric(data$category), method = "spearman")
+cor_value
+```
+
+## Visualization
+
+```{r, echo=FALSE}
+library(ggplot2)
+p <- ggplot(data, aes(x = category, y = count)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  geom_text(aes(label = count), vjust = -0.5) +
+  theme_minimal() +
+  labs(
+    title = "Count by Size Category",
+    x = "Size Category",
+    y = "Count"
+  )
+
+print(p)

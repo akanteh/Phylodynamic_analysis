@@ -1,0 +1,114 @@
+---
+title: "Phylodynamic analysis of SARS-CoV-2 virus in the Gambia"
+subtitle: "Transmission lineage breakdown (detailed descriptions)"
+author: "Abdoulie Kanteh"
+date: '`r format(Sys.time(), "Last modified: %d %b %Y")`'
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    keep_tex: false
+    fig_crop: false
+layout: page
+editor_options: 
+  chunk_output_type: inline
+params: 
+  inputpath  : "/Users/akanteh/Documents/Gambia-lineage-dynamics-analysis/data/phylogenetic/test/"
+  outputpath : "/Users/akanteh/Documents/Gambia-lineage-dynamics-analysis/analyses/phylogenetic/results/combined_beast_dta/test/Gambia/newAnalysis/"
+  cluster_f  : "DTA"
+  startDate  : "2020-03-17"
+  endDate    : "2022-03-31"
+  device     : "pdf"
+  
+---
+
+```{r rsetup, include=FALSE}
+  
+    library(lubridate)
+    library(gplots)
+    library(viridis)
+    library(tictoc)
+    source("/Users/akanteh/Documents/Gambia-lineage-dynamics-analysis/analyses/phylogenetic/scripts/palettes.R")
+    source("/Users/akanteh/Documents/Gambia-lineage-dynamics-analysis/analyses/phylogenetic/scripts/plotutils.R")
+    #source("../scripts/clusterutils.R")
+
+    inputpath  <- params$inputpath
+    outputpath <- params$outputpath
+    cluster_f  <- params$cluster_f
+    
+    startDate  <- as.Date(params$startDate)
+    endDate    <- as.Date(params$endDate)
+
+    figpath    <- paste0(outputpath, "figures/lineage_breakdown_figures_", params$device, "/")
+    dir.create(figpath, recursive = TRUE, showWarnings = FALSE)
+    
+    cachepath  <- paste0(outputpath, "figures/cache/lineageBreakdown_", params$device, "/")
+
+
+    knitr::opts_chunk$set(tidy=FALSE, cache=FALSE, cache.path = cachepath, 
+                          dev=params$device, fig.path=figpath, dpi=300,
+                          message=FALSE, error=TRUE, warning=TRUE, echo=FALSE)
+    
+    labelDates <- list("oldestCase" = as.Date("2020-03-15"), 
+                       "oldestSeq"  = as.Date("2020-03-17"))
+    
+    dateBreaks  <- seq.Date(startDate, endDate+1, by="day")
+
+```
+
+# Summary
+This notebook plots breakdowns of Gambia transmission lineages over time (using only the assignment on the MCC trees).
+
+## Input
+- Metadata table (in `inputpath`).
+- Cluster statistics for MCC trees (in `outputpath`):
+  - `clusters_DTA_MCC_0.5.csv`
+  - `clusterSamples_DTA_MCC_0.5.csv`
+
+## Output
+- Lineage breakdown figures and tables.
+
+
+```{r load-data, cache=TRUE}
+               
+    metadata              <- read.csv(paste0(inputpath, "metadata.csv"))
+    metadata$sample_date  <- as.Date(metadata$sample_date, format= "%Y-%m-%d")
+    metadata$sample_date  <- ymd(metadata$sample_date)
+    metadata$decimal_date <- decimal_date(metadata$sample_date)    
+    metadata$taxon_label  <- metadata$sequence_name
+    #metadata$taxon_label <- gsub("/", "_", as.character(metadata$sequence_name))
+    
+    clusterStatsMCC   <- read.csv(paste0(outputpath, "clusters_", cluster_f, "_MCC_0.5.csv"))
+    clusterSamplesMCC <- read.csv(paste0(outputpath, "clusterSamples_", cluster_f, "_MCC_0.5.csv"))
+
+    # Convert dates to POSIX dates
+    clusterStatsMCC$tmrca_calendar <- ymd(clusterStatsMCC$tmrca_calendar)
+    clusterSamplesMCC$sample_date  <- ymd(clusterSamplesMCC$sample_date)
+
+    
+    lineageSizes <- sort(table(clusterSamplesMCC$cluster))
+    clusterSamplesMCC$lineage_seqs            <- sapply(as.character(clusterSamplesMCC$cluster), function(x) lineageSizes[x])
+    clusterSamplesMCC$lineage_tmrca           <- sapply(seq_len(nrow(clusterSamplesMCC)), function(x) 
+                                                        ifelse(clusterSamplesMCC$lineage_seqs[x] == 1, NA, clusterStatsMCC$tmrca[clusterStatsMCC$cluster == as.character(clusterSamplesMCC$cluster[x])]))
+    #clusterSamplesMCC$lineage_tmrca_calendar  <- sapply(seq_len(nrow(clusterSamplesMCC)), function(x) 
+    #                                                    ifelse(clusterSamplesMCC$lineage_seqs[x] == 1, NA, clusterStatsMCC$tmrca_calendar[clusterStatsMCC$cluster == as.character(clusterSamplesMCC$cluster[x])]))
+    clusterSamplesMCC$lineage_oldest          <- sapply(seq_len(nrow(clusterSamplesMCC)), function(x) 
+                                                        ifelse(clusterSamplesMCC$lineage_seqs[x] == 1, NA, clusterStatsMCC$oldest[clusterStatsMCC$cluster == as.character(clusterSamplesMCC$cluster[x])]))
+    clusterSamplesMCC$lineage_mostrecent      <- sapply(seq_len(nrow(clusterSamplesMCC)), function(x) 
+                                                        ifelse(clusterSamplesMCC$lineage_seqs[x] == 1, NA, clusterStatsMCC$mostrecent[clusterStatsMCC$cluster == as.character(clusterSamplesMCC$cluster[x])]))
+    clusterSamplesMCC$lineage_duration        <- 366*(clusterSamplesMCC$lineage_mostrecent - clusterSamplesMCC$lineage_tmrca)
+    clusterSamplesMCC$lineage_age             <- 366*(clusterSamplesMCC$decimal_date - clusterSamplesMCC$lineage_oldest)
+    
+    clusterSamplesMCCnoSingles <- clusterSamplesMCC[!is.na(clusterSamplesMCC$lineage_tmrca), ]
+    clusterSamplesMCCnoSingles$lineage_tmrca_calendar <- ymd(round_date(date_decimal(clusterSamplesMCCnoSingles$lineage_tmrca), unit="day"))
+    # Get the cutoff for plotting samples in lineage plots
+    # (First day when cumulatively 500 UK genomes have been sequenced)
+    ukgenomes <- sort(metadata$sample_date[metadata$country == "Gambia"])
+    cutoff    <- ukgenomes[30]
+    
+```
+
+
+
+

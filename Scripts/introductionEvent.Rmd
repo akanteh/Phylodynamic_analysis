@@ -1,0 +1,120 @@
+---
+title: "singleIndependentIntoduction"
+author: "Abdoulie kanteh"
+date: "2025-01-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Load Required Libraries
+```{r}
+library(diagram)
+library(HDInterval)
+library(lubridate)
+library(seraphim)
+library(treeio)
+library(dplyr)
+library(ape)
+library(sf)
+```
+
+## 1. Preparing the Input Files
+```{r}
+setwd("~/Documents/backup11:08:2022/phylodynamic_newAnalysis/cluster/gambianSamples/DatasetB/NewDataAnalysis/phylogeography/timetree/discreteTrait/analysisWithR/")
+
+analysis <- "GambaGlobalDatasetB.pass.alignedDiscretSupsamples"
+removeSuspiciousHomoplasies <- FALSE
+writingFiles <- TRUE
+showingPlots <- TRUE
+
+tree <- read.nexus(paste0(analysis, ".tree"))
+
+if (grepl("GambaGlobalDatasetB.pass.alignedDiscretSupsamples", analysis)) {
+  seqIDs <- tree$tip.label
+  countries <- rep(NA, length(seqIDs))
+  collectionDates <- rep(NA, length(seqIDs))
+  
+  for (i in 1:length(seqIDs)) {
+    if (grepl("hCoV-19", seqIDs[i])) {
+      countries[i] <- unlist(strsplit(seqIDs[i],"\\/"))[2]
+    } else {
+      countries[i] <- unlist(strsplit(seqIDs[i],"\\/"))[1]
+    }
+    
+    split_seq <- unlist(strsplit(seqIDs[i], "\\|"))
+    
+    if (length(split_seq) == 3) {
+      collectionDates[i] <- split_seq[length(split_seq)]
+    } else if (length(split_seq) == 4) {
+      collectionDates[i] <- split_seq[length(split_seq) - 1]
+    }
+  }
+  
+  tab <- data.frame(Strain = seqIDs, Country = countries, CollectionData = collectionDates)
+  write.csv(tab, paste0(analysis, ".csv"), row.names = FALSE, quote = FALSE)
+  data <- read.csv(paste0(analysis, ".csv"))
+}
+```
+
+## 2. Import DatasetB Annotation File
+```{r}
+gambiaData <- read.csv("~/Documents/backup11_08_2022/phylodynamic_newAnalysis/cluster/gambianSamples/DatasetB/NewDataAnalysis/datasetBdates.txt", sep = "\t")
+
+gambiaData <- gambiaData %>%
+  mutate(country = "Gambia") %>%
+  rename(Strain = Name) %>%
+  select(Strain, country, date) %>%
+  rename(Collection.data = date)
+
+joinData <- left_join(data, gambiaData, by = "Strain")
+joinData$Country <- ifelse(joinData$Strain == joinData$Country, "Gambia", joinData$Country)
+joinData <- joinData %>% select(Strain, Country, Collection.data)
+joinData$Collection.data <- as.Date(as.character(joinData$Collection.data), format = "%Y-%m-%d")
+joinData$Country[1119] <- "Wuhan"
+
+write.csv(joinData, paste0(analysis, ".csv"))
+```
+
+## 3. Visualizing the Phylogenetic Tree
+```{r}
+if (showingPlots) {
+  plot(tree, type="fan", show.tip.label=FALSE, edge.width=0.5, cex=0.6, col="gray30")
+  add.scale.bar(lwd=0.5, lcol="gray30", cex=0.7)
+}
+```
+
+## 4. Analysis of Discrete Phylogeographic Results
+```{r}
+burnIn <- 501
+computingHPDInterval <- FALSE
+
+if (computingHPDInterval) {
+  trees <- scan(paste0(analysis, ".trees"), what = "", sep = "\n", quiet = TRUE)
+  indices2 <- which(grepl("tree STATE_", trees))
+  gambianIntroductions_list <- rep(NA, length(trees))
+  
+  for (i in (burnIn + 1):length(indices2)) {
+    tree1 <- trees[c(indices2[i])]
+    tree2 <- readAnnotatedNexus(textConnection(tree1))
+    
+    gambianIntroductions <- sum(sapply(tree2$annotations, function(x) x$states == "Gambia"))
+    gambianIntroductions_list[i] <- gambianIntroductions
+  }
+  
+  HPD <- HDInterval::hdi(gambianIntroductions_list[!is.na(gambianIntroductions_list)])
+  cat("Estimated lineage introductions: ", median(gambianIntroductions_list, na.rm=TRUE), " (95% HPD = [", HPD[1], "-", HPD[2], "])\n")
+}
+```
+
+## 5. Save Processed Data
+```{r}
+write.table(joinData, paste0(analysis, "_processed.txt"), row.names = FALSE, sep = "\t", quote = FALSE)
+```
+
+## Summary
+This script processes phylogenetic data, visualizes it, and analyzes lineage dispersal patterns in Gambia. The results help understand the introduction and spread of viral lineages.
+
